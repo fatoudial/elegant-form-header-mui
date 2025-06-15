@@ -34,12 +34,10 @@ export const StepFormController = () => {
   const [showResults, setShowResults] = useState(false);
   const [showValidationError, setShowValidationError] = useState(false);
   const [openSnackbar, setOpenSnackbar] = useState(false);
-const [snackbarMessage, setSnackbarMessage] = useState("");
-
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   const { isLoading: isLoadingFactors, data: factors, error: factorsError } = useGetFactorsHierarchy();
   const { mutateAsync: calculateScore, isPending: isCalculatingScore } = useCalculateScore();
-  
 
   const updateFormData = useCallback((newData) => {
     setFormData(prev => {
@@ -54,9 +52,7 @@ const [snackbarMessage, setSnackbarMessage] = useState("");
     });
   }, []);
 
-
   const steps = useMemo(() => {
-    
     const baseSteps = [
       { 
         id: "identification", 
@@ -66,7 +62,6 @@ const [snackbarMessage, setSnackbarMessage] = useState("");
     ];
 
     if (factors?.length > 0) {
-      
       const dynamicSteps = factors.map(factor => {
         return {
           id: factor.id.toString(),
@@ -84,73 +79,70 @@ const [snackbarMessage, setSnackbarMessage] = useState("");
 
   const theme = useTheme();
 
-const validateIdentificationStep = () => {
-  const requiredFields = [
-    "company-name",
-    "business-activity",
-    "manager-name",
-    "birth-date",
-    "relationship-date",
-    "account-number"
-  ];
+  const validateIdentificationStep = () => {
+    const requiredFields = [
+      "company-name",
+      "business-activity",
+      "manager-name",
+      "birth-date",
+      "relationship-date",
+      "account-number"
+    ];
 
-  const missingFields = requiredFields.filter(field => !formData[field]);
+    const missingFields = requiredFields.filter(field => !formData[field]);
 
-  if (missingFields.length > 0) {
-    setShowValidationError(true);
-    setOpenSnackbar(true); 
-    return false;
-  }
-
-  return true;
-};
-
-
-const validateAllCriteriasFilled = () => {
-  if (!factors || factors.length === 0) {
-    console.warn("❌ Aucun facteur chargé");
-    return false;
-  }
-
- 
-  // Récupère tous les critères requis depuis les facteurs chargés
-  const allRequiredCriteria = [];
-  
-  factors.forEach(factor => {
-    if (factor.subFactors && factor.subFactors.length > 0) {
-      factor.subFactors.forEach(subFactor => {
-        if (subFactor.criterias && subFactor.criterias.length > 0) {
-          subFactor.criterias.forEach(criteria => {
-            allRequiredCriteria.push(criteria.code);
-          });
-        }
-      });
+    if (missingFields.length > 0) {
+      setShowValidationError(true);
+      setOpenSnackbar(true); 
+      return false;
     }
-  });
 
-  console.log("✅ Critères requis :", allRequiredCriteria);
+    return true;
+  };
 
-  // Vérifie que chaque critère requis a une réponse valide
-  const emptyCriteria = allRequiredCriteria.filter(criteriaCode => {
-    const value = formData[criteriaCode];
-    const isEmpty = value === null || value === undefined || value === "" || value === "-1";
-    if (isEmpty) {
-      console.log(`❌ Critère vide: ${criteriaCode} = "${value}"`);
+  const validateAllCriteriasFilled = () => {
+    if (!factors || factors.length === 0) {
+      console.warn("❌ Aucun facteur chargé");
+      return false;
     }
-    return isEmpty;
-  });
 
-  console.log("❌ Critères non remplis :", emptyCriteria.length);
-  
-  if (emptyCriteria.length > 0) {
-    console.warn("❌ Critères non remplis :", emptyCriteria);
-    setSnackbarMessage(`Veuillez remplir tous les critères d'évaluation (${emptyCriteria.length} manquant${emptyCriteria.length > 1 ? 's' : ''})`);
-    return false;
-  }
+    // Récupère tous les critères requis depuis les facteurs chargés
+    const allRequiredCriteria = [];
+    
+    factors.forEach(factor => {
+      if (factor.subFactors && factor.subFactors.length > 0) {
+        factor.subFactors.forEach(subFactor => {
+          if (subFactor.criterias && subFactor.criterias.length > 0) {
+            subFactor.criterias.forEach(criteria => {
+              allRequiredCriteria.push(criteria.code);
+            });
+          }
+        });
+      }
+    });
 
-  return true;
-};
+    console.log("✅ Critères requis :", allRequiredCriteria);
 
+    // Vérifie que chaque critère requis a une réponse valide
+    const emptyCriteria = allRequiredCriteria.filter(criteriaCode => {
+      const value = formData[criteriaCode];
+      const isEmpty = value === null || value === undefined || value === "" || value === "-1";
+      if (isEmpty) {
+        console.log(`❌ Critère vide: ${criteriaCode} = "${value}"`);
+      }
+      return isEmpty;
+    });
+
+    console.log("❌ Critères non remplis :", emptyCriteria.length);
+    
+    if (emptyCriteria.length > 0) {
+      console.warn("❌ Critères non remplis :", emptyCriteria);
+      setSnackbarMessage(`Veuillez remplir tous les critères d'évaluation (${emptyCriteria.length} manquant${emptyCriteria.length > 1 ? 's' : ''})`);
+      return false;
+    }
+
+    return true;
+  };
 
   const nextStep = () => {
     if (currentStep === 0 && !validateIdentificationStep()) 
@@ -169,31 +161,7 @@ const validateAllCriteriasFilled = () => {
   };
 
   const handleSubmit = async () => {
-
-  // 1. Vérifie l'identification
-  // if (!validateIdentificationStep()) {
-  //   console.warn("🚫 Données identification incomplètes");
-  //   setCurrentStep(0);
-  //   setSnackbarMessage("Veuillez remplir les champs d’identification.");
-  //   setOpenSnackbar(true);
-  //   return;
-  // }
-
-  // // 2. Vérifie les critères dynamiques
-  // if (!validateAllCriteriasFilled()) {
-  //   console.warn("🚫 Critères d’évaluation incomplets");
-  //   setCurrentStep(steps.length - 1);
-  //   setSnackbarMessage("Veuillez remplir tous les critères d’évaluation.");
-  //   setOpenSnackbar(true);
-  //   return;
-  // }
-
-  // const calculationPayload = {
-  //   clientCode: formData["account-number"] || "15900",
-  //   clientName: formData["company-name"] || "TALENTS CONSULT",
-  //   criterias: formData
-  // };
-      console.log("🔍 Données complètes du formulaire:", formData);
+    console.log("🔍 Données complètes du formulaire:", formData);
 
     // Séparation des données d'identification
     const identificationFields = [
@@ -226,33 +194,32 @@ const validateAllCriteriasFilled = () => {
     console.log("📋 Données d'identification séparées:", identificationData);
     console.log("📊 Critères séparés:", criteriaData); 
 
-   // Construction du payload avec les données séparées
+    // Construction du payload avec les données séparées
     const calculationPayload = {
       clientCode: identificationData["account-number"] || "15900",
       clientName: identificationData["company-name"] || "TALENTS CONSULT",
       identificationData: identificationData,
       criterias: criteriaData
     };
-        console.log("🚀 Payload final envoyé:", calculationPayload);
+    console.log("🚀 Payload final envoyé:", calculationPayload);
 
-  setSubmitted(true);
+    setSubmitted(true);
 
-  try {
-    const scoreResponse = await calculateScore(calculationPayload);
-    const finalData = {
-      ...calculationPayload, // contient identificationData + criterias
-      scoreResult: scoreResponse
-    };
-    setTimeout(() => {
-
-      setFormData(finalData);
-      setShowResults(true);
-    }, 1500);
-  } catch (error) {
-    console.error("❌ Erreur lors du calcul du score:", error);
-    setSubmitted(false);
-  }
-};
+    try {
+      const scoreResponse = await calculateScore(calculationPayload);
+      const finalData = {
+        ...calculationPayload, // contient identificationData + criterias
+        scoreResult: scoreResponse
+      };
+      setTimeout(() => {
+        setFormData(finalData);
+        setShowResults(true);
+      }, 1500);
+    } catch (error) {
+      console.error("❌ Erreur lors du calcul du score:", error);
+      setSubmitted(false);
+    }
+  };
 
   const resetForm = () => {
     setFormData({});
@@ -289,11 +256,9 @@ const validateAllCriteriasFilled = () => {
       />
     );
   }
-  
-return (    
+
+  return (    
     <Box sx={{ width: '100%' }}>
-    
-      {/* En-tête blanche séparée */}
       <Card
         sx={{
           backgroundColor: 'white',
@@ -315,24 +280,18 @@ return (
           >
             Formulaire d'Évaluation PME
           </Typography>
-          {/* Stepper personnalisé avec décalage */}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 4, mb: 4 }}>
             {steps.map((_, index) => {
               const isCompleted = index < currentStep;
               const isActive = index === currentStep;
+              const circleWrapperStyle =
+                index === 0
+                  ? { flex: 1, display: 'flex', alignItems: 'center', pl: 8 /* décalage visuel */ }
+                  : index === steps.length - 1
+                  ? { flex: 1, display: 'flex', alignItems: 'center', pr: 3 }
+                  : { flex: 1, display: 'flex', alignItems: 'center' };
               return (
-                <Box
-                  key={index}
-                  sx={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    // Déplacement du premier et dernier cercle :
-                    pl: index === 0 ? 3 : 0,   // 3 == 24px (thème spacing)
-                    pr: index === steps.length - 1 ? 3 : 0,
-                  }}
-                >
-                  {/* Cercle avec numéro */}
+                <Box key={index} sx={circleWrapperStyle}>
                   <Box
                     sx={{
                       width: 36,
@@ -354,7 +313,6 @@ return (
                   >
                     {index + 1}
                   </Box>
-                  {/* Barre de liaison sauf pour le dernier élément */}
                   {index !== steps.length - 1 && (
                     <Box
                       sx={{
@@ -373,19 +331,15 @@ return (
           </Box>
         </CardContent>
       </Card>
-
       <Box sx={{ p: 4 }}>
-
         {(submitted || isCalculatingScore) && !showResults && (
           <Alert severity="info" sx={{ mb: 3 }}>
             <Typography variant="h6">Traitement en cours...</Typography>
             <Typography variant="body2">Analyse des données et génération du scoring PME.</Typography>
           </Alert>
         )}
-
         <Card sx={{ mb: 4, backgroundColor: '#f5f5f5', boxShadow: 'none' }}>
           <CardContent sx={{ flex: 1, p: 0 }}>
-            {/* Affichage du step actuel avec vérification */}
             {steps[currentStep] ? steps[currentStep].component : (
               <Alert severity="warning">
                 Step {currentStep} non trouvé. Total steps: {steps.length}
@@ -393,7 +347,6 @@ return (
             )}
           </CardContent>
         </Card>
-
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
           <Button 
             onClick={prevStep} 
@@ -404,7 +357,6 @@ return (
           >
             Précédent
           </Button>
-          
           {currentStep === steps.length - 1 ? (
             <Button 
               onClick={handleSubmit} 
@@ -425,17 +377,17 @@ return (
             </Button>
           )}
         </Box>
-  </Box>
-       <Snackbar
-  open={openSnackbar}
-  autoHideDuration={4000}
-  onClose={() => setOpenSnackbar(false)}
-  anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
->
-  <MuiAlert severity="warning" onClose={() => setOpenSnackbar(false)} sx={{ width: '100%' }}>
-    Veuillez remplir tous les champs requis dans l'étape d'identification.
-  </MuiAlert>
-</Snackbar>
+      </Box>
+      <Snackbar
+        open={openSnackbar}
+        autoHideDuration={4000}
+        onClose={() => setOpenSnackbar(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <MuiAlert severity="warning" onClose={() => setOpenSnackbar(false)} sx={{ width: '100%' }}>
+          Veuillez remplir tous les champs requis dans l'étape d'identification.
+        </MuiAlert>
+      </Snackbar>
     </Box>
   );
 };
