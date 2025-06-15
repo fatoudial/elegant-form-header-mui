@@ -1,11 +1,19 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+// Page d'accueil avec l'entête moderne et élégante PME
+
+import HeaderPME from "@/components/HeaderPME";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-2">
+      <div className="w-full max-w-3xl">
+        <HeaderPME />
+        {/* Reste du contenu ou du formulaire ici : */}
+        <div className="bg-white rounded-b-2xl shadow-lg px-10 pt-12 pb-14 border-t-0 border border-border">
+          <p className="text-lg text-muted-foreground text-center">
+            Commencez à remplir le formulaire pour évaluer votre entreprise.
+          </p>
+        </div>
       </div>
     </div>
   );
