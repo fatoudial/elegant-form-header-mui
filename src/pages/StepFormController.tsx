@@ -264,38 +264,51 @@ export const StepFormController = () => {
           backgroundColor: 'white',
           borderRadius: 4,
           boxShadow: 4,
+          mb: 2,
         }}
       >
-        <CardContent sx={{ p: 0 }}>
+        <CardContent sx={{ p: 1, pb: '8px !important' }}>
           <Typography
-            variant="h3"
+            variant="h4"
             align="center"
             gutterBottom
             sx={{
               fontWeight: 'bold',
               color: 'primary.main',
-              fontSize: '1.9rem',
-              mb: 3,
+              fontSize: '1.3rem',
+              mb: 1,
+              mt: 0.5,
+              lineHeight: 1.2,
             }}
           >
             Formulaire d'Évaluation PME
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 4, mb: 4 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mt: 2,
+              mb: 2,
+              minHeight: 36,
+            }}
+          >
             {steps.map((_, index) => {
               const isCompleted = index < currentStep;
               const isActive = index === currentStep;
-              const circleWrapperStyle =
-                index === 0
-                  ? { flex: 1, display: 'flex', alignItems: 'center', pl: 8 /* décalage visuel */ }
-                  : index === steps.length - 1
-                  ? { flex: 1, display: 'flex', alignItems: 'center', pr: 3 }
-                  : { flex: 1, display: 'flex', alignItems: 'center' };
+              const circleWrapperStyle = {
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                paddingLeft: index === 0 ? 24 : 0,
+                paddingRight: index === steps.length - 1 ? 24 : 0,
+              };
               return (
                 <Box key={index} sx={circleWrapperStyle}>
                   <Box
                     sx={{
-                      width: 36,
-                      height: 36,
+                      width: 28,
+                      height: 28,
                       borderRadius: '50%',
                       backgroundColor: isCompleted
                         ? theme.palette.secondary.main
@@ -307,21 +320,26 @@ export const StepFormController = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: 'bold',
-                      fontSize: '1rem',
+                      fontSize: '0.95rem',
                       zIndex: 1,
+                      transition: 'background .2s',
                     }}
                   >
                     {index + 1}
                   </Box>
+
+                  {/* Barre de liaison sauf pour le dernier élément */}
                   {index !== steps.length - 1 && (
                     <Box
                       sx={{
-                        height: 4,
-                        width: 60,
+                        height: 3,
+                        width: 32,
                         backgroundColor:
                           index < currentStep
                             ? theme.palette.primary.main
                             : theme.palette.grey[300],
+                        mx: { xs: 0.5, sm: 1 },
+                        transition: 'background .2s',
                       }}
                     />
                   )}
