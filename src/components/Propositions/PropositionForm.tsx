@@ -14,13 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/datepicker";
-import { Save, Send, Calculator, Users, Building, CheckCircle, Plus, Trash2, Loader2, Minus, ArrowLeft } from "lucide-react";
+import { Save, Send, Calculator, Users, Building, CheckCircle, Plus, Trash2, Loader2, Minus } from "lucide-react";
 import { usePropositionActions } from "@/hooks/usePropositionActions";
 import QuickSimulator from "./QuickSimulator";
 import AmortizationTable from "./AmortizationTable";
-import LeasingTypeSelector from "./LeasingTypeSelector";
-import ConventionSelector from "./ConventionSelector";
-import CampagneSelector from "./CampagneSelector";
 import { TypeProposition, Convention, Campagne } from "@/types/leasing";
 import {
   Table,
@@ -35,6 +32,9 @@ interface MaterialItem {
   id: number;
   type: "materiel" | "composant";
   parentId?: number;
+  typeLeasingMateriel: TypeProposition;
+  selectedConvention?: Convention;
+  selectedCampagne?: Campagne;
   fournisseur: string;
   reference: string;
   designation: string;
@@ -48,6 +48,102 @@ interface MaterialItem {
   dateImmatriculation?: Date;
   dateMiseEnService?: Date;
 }
+
+// Données de démonstration pour les conventions
+const CONVENTIONS_DISPONIBLES: Convention[] = [
+  {
+    id: "conv-vehicules-pro",
+    nom: "Véhicules Professionnels",
+    description: "Convention dédiée aux véhicules utilitaires et professionnels",
+    fournisseurs: ["babacar-fils", "senegal-auto"],
+    bareme: {
+      taux: 6.5,
+      marge: 2.8,
+      valeurResiduelle: 1.8
+    },
+    dateDebut: new Date("2024-01-01"),
+    dateFin: new Date("2024-12-31"),
+    actif: true
+  },
+  {
+    id: "conv-equipement-industriel",
+    nom: "Équipement Industriel",
+    description: "Convention pour les machines et équipements industriels",
+    fournisseurs: ["sonacos", "afrique-materiel"],
+    bareme: {
+      taux: 6.0,
+      marge: 2.5,
+      valeurResiduelle: 2.0
+    },
+    dateDebut: new Date("2024-01-01"),
+    actif: true
+  },
+  {
+    id: "conv-btp",
+    nom: "BTP & Construction",
+    description: "Convention spécialisée dans les équipements de construction",
+    fournisseurs: ["dakar-equipement"],
+    bareme: {
+      taux: 6.8,
+      marge: 3.0,
+      valeurResiduelle: 1.5
+    },
+    dateDebut: new Date("2024-01-01"),
+    dateFin: new Date("2024-12-31"),
+    actif: true
+  }
+];
+
+// Données de démonstration pour les campagnes
+const CAMPAGNES_DISPONIBLES: Campagne[] = [
+  {
+    id: "camp-ete-2024",
+    nom: "Campagne Été 2024",
+    description: "Offre spéciale véhicules avec taux exceptionnel",
+    type: "fournisseur",
+    fournisseurs: ["babacar-fils", "senegal-auto"],
+    bareme: {
+      taux: 4.5,
+      marge: 2.0,
+      valeurResiduelle: 1.0
+    },
+    dateDebut: new Date("2024-06-01"),
+    dateFin: new Date("2024-08-31"),
+    actif: true,
+    prioritaire: true
+  },
+  {
+    id: "camp-equipement-industriel",
+    nom: "Industrialisation 2024",
+    description: "Campagne banque pour l'équipement industriel",
+    type: "banque",
+    bareme: {
+      taux: 5.0,
+      marge: 2.2,
+      valeurResiduelle: 1.5
+    },
+    dateDebut: new Date("2024-01-01"),
+    dateFin: new Date("2024-12-31"),
+    actif: true,
+    prioritaire: true
+  },
+  {
+    id: "camp-btp-urgent",
+    nom: "BTP Express",
+    description: "Financement accéléré pour équipements BTP",
+    type: "fournisseur",
+    fournisseurs: ["dakar-equipement"],
+    bareme: {
+      taux: 5.5,
+      marge: 2.8,
+      valeurResiduelle: 2.0
+    },
+    dateDebut: new Date("2024-07-01"),
+    dateFin: new Date("2024-09-30"),
+    actif: true,
+    prioritaire: true
+  }
+];
 
 // Liste prédéfinie des matériels disponibles
 const MATERIELS_DISPONIBLES = {
@@ -75,16 +171,12 @@ const MATERIELS_DISPONIBLES = {
 };
 
 const PropositionForm = () => {
-  const [currentTab, setCurrentTab] = useState("type-leasing");
+  const [currentTab, setCurrentTab] = useState("type-client");
   const [clientType, setClientType] = useState<"Client" | "Prospect" | null>(null);
-  const [leasingType, setLeasingType] = useState<TypeProposition | null>(null);
-  const [selectedConvention, setSelectedConvention] = useState<Convention | null>(null);
-  const [selectedCampagne, setSelectedCampagne] = useState<Campagne | null>(null);
   const { saveAsDraft, sendForValidation, isLoading } = usePropositionActions();
   
   // État pour les matériels et composants
   const [materialItems, setMaterialItems] = useState<MaterialItem[]>([]);
-  const [selectedFournisseurs, setSelectedFournisseurs] = useState<string[]>([]);
   
   const [formData, setFormData] = useState({
     typeLocataire: "",
@@ -157,7 +249,10 @@ const PropositionForm = () => {
       id: newId,
       type: type,
       parentId: parentId,
-      fournisseur: parentItem?.fournisseur || "",
+      typeLeasingMateriel: "standard",
+      selectedConvention: undefined,
+      selectedCampagne: undefined,
+      fournisseur: "",
       reference: "",
       designation: "",
       categorie: "",
@@ -193,6 +288,26 @@ const PropositionForm = () => {
     setMaterialItems(prev => prev.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
+        
+        // Reset dependent fields when leasing type changes
+        if (field === 'typeLeasingMateriel') {
+          updatedItem.selectedConvention = undefined;
+          updatedItem.selectedCampagne = undefined;
+          updatedItem.fournisseur = "";
+          updatedItem.reference = "";
+          updatedItem.designation = "";
+          updatedItem.categorie = "";
+          updatedItem.montantHT = "";
+        }
+        
+        // Reset fournisseur when convention/campagne changes
+        if (field === 'selectedConvention' || field === 'selectedCampagne') {
+          updatedItem.fournisseur = "";
+          updatedItem.reference = "";
+          updatedItem.designation = "";
+          updatedItem.categorie = "";
+          updatedItem.montantHT = "";
+        }
         
         if (field === 'designation' && item.fournisseur && item.categorie && item.type === 'materiel') {
           const fournisseurData = MATERIELS_DISPONIBLES[item.fournisseur as keyof typeof MATERIELS_DISPONIBLES];
@@ -232,6 +347,31 @@ const PropositionForm = () => {
     }));
   };
 
+  // Fonction pour obtenir les fournisseurs disponibles selon le type de leasing du matériel
+  const getAvailableFournisseurs = (item: MaterialItem) => {
+    if (item.typeLeasingMateriel === "standard") {
+      return Object.keys(MATERIELS_DISPONIBLES);
+    }
+    if (item.typeLeasingMateriel === "convention" && item.selectedConvention) {
+      return item.selectedConvention.fournisseurs;
+    }
+    if (item.typeLeasingMateriel === "campagne" && item.selectedCampagne) {
+      return item.selectedCampagne.fournisseurs || Object.keys(MATERIELS_DISPONIBLES);
+    }
+    return [];
+  };
+
+  // Fonction pour obtenir le barème applicable pour un matériel
+  const getApplicableBareme = (item: MaterialItem) => {
+    if (item.typeLeasingMateriel === "campagne" && item.selectedCampagne) {
+      return item.selectedCampagne.bareme;
+    }
+    if (item.typeLeasingMateriel === "convention" && item.selectedConvention) {
+      return item.selectedConvention.bareme;
+    }
+    return { taux: 7.5, marge: 3.0, valeurResiduelle: 2.0 }; // Standard
+  };
+
   const getChildrenItems = (parentId: number) => {
     return materialItems.filter(item => item.parentId === parentId);
   };
@@ -254,29 +394,11 @@ const PropositionForm = () => {
     return materiels.filter(m => m.categorie === categorie);
   };
 
-  // Fonction pour obtenir les fournisseurs disponibles selon le type de leasing
-  const getAvailableFournisseurs = () => {
-    if (leasingType === "standard") {
-      return Object.keys(MATERIELS_DISPONIBLES);
-    }
-    if (leasingType === "convention" && selectedConvention) {
-      return selectedConvention.fournisseurs;
-    }
-    if (leasingType === "campagne" && selectedCampagne) {
-      return selectedCampagne.fournisseurs || Object.keys(MATERIELS_DISPONIBLES);
-    }
-    return [];
-  };
-
-  // Fonction pour obtenir le barème applicable
-  const getApplicableBareme = () => {
-    if (leasingType === "campagne" && selectedCampagne) {
-      return selectedCampagne.bareme;
-    }
-    if (leasingType === "convention" && selectedConvention) {
-      return selectedConvention.bareme;
-    }
-    return { taux: 7.5, marge: 3.0, valeurResiduelle: 2.0 }; // Standard
+  const isValidCampagne = (campagne: Campagne) => {
+    const now = new Date();
+    return campagne.actif && 
+           campagne.dateDebut <= now && 
+           campagne.dateFin >= now;
   };
 
   const handleSaveAsDraft = async () => {
@@ -284,12 +406,7 @@ const PropositionForm = () => {
       const propositionData = {
         ...formData,
         materialItems,
-        selectedFournisseurs,
-        clientType,
-        leasingType,
-        selectedConvention,
-        selectedCampagne,
-        baremeApplique: getApplicableBareme()
+        clientType
       };
       await saveAsDraft(propositionData);
     } catch (error) {
@@ -302,12 +419,7 @@ const PropositionForm = () => {
       const propositionData = {
         ...formData,
         materialItems,
-        selectedFournisseurs,
-        clientType,
-        leasingType,
-        selectedConvention,
-        selectedCampagne,
-        baremeApplique: getApplicableBareme()
+        clientType
       };
       await sendForValidation(propositionData);
     } catch (error) {
@@ -368,7 +480,7 @@ const PropositionForm = () => {
 
       {clientType && (
         <Button 
-          onClick={() => setCurrentTab("type-leasing")}
+          onClick={() => setCurrentTab("client")}
           className="mt-6 w-full md:w-auto"
         >
           Continuer avec {clientType}
@@ -381,10 +493,9 @@ const PropositionForm = () => {
     <div className="max-w-7xl mx-auto px-4 md:px-6">
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
         <div className="overflow-x-auto">
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 min-w-[700px] md:min-w-full">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 min-w-[500px] md:min-w-full">
             <TabsTrigger value="type-client" className="text-xs">Type Client</TabsTrigger>
-            <TabsTrigger value="type-leasing" disabled={!clientType} className="text-xs">Type Leasing</TabsTrigger>
-            <TabsTrigger value="client" disabled={!leasingType} className="text-xs">1. Client</TabsTrigger>
+            <TabsTrigger value="client" disabled={!clientType} className="text-xs">1. Client</TabsTrigger>
             <TabsTrigger value="general" className="text-xs">2. Général</TabsTrigger>
             <TabsTrigger value="materiel" className="text-xs">3. Matériel</TabsTrigger>
             <TabsTrigger value="baremes" className="text-xs">4. Barèmes</TabsTrigger>
@@ -395,66 +506,6 @@ const PropositionForm = () => {
 
         <TabsContent value="type-client">
           {renderClientTypeSelection()}
-        </TabsContent>
-
-        <TabsContent value="type-leasing">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg md:text-xl">Type de proposition de leasing</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <LeasingTypeSelector
-                selectedType={leasingType}
-                onTypeSelect={setLeasingType}
-                onContinue={() => setCurrentTab("client")}
-              />
-
-              {leasingType === "convention" && (
-                <div className="pt-6 border-t">
-                  <ConventionSelector
-                    selectedConvention={selectedConvention}
-                    onConventionSelect={setSelectedConvention}
-                  />
-                </div>
-              )}
-
-              {leasingType === "campagne" && (
-                <div className="pt-6 border-t">
-                  <CampagneSelector
-                    selectedCampagne={selectedCampagne}
-                    onCampagneSelect={setSelectedCampagne}
-                  />
-                </div>
-              )}
-
-              {leasingType && (leasingType === "standard" || 
-                (leasingType === "convention" && selectedConvention) || 
-                (leasingType === "campagne" && selectedCampagne)) && (
-                <div className="pt-4 border-t">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-blue-800 mb-2">
-                      Barème sélectionné : {leasingType === "standard" ? "Standard" : 
-                        leasingType === "convention" ? selectedConvention?.nom : selectedCampagne?.nom}
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-blue-600">Taux : </span>
-                        <span className="font-medium">{getApplicableBareme().taux}%</span>
-                      </div>
-                      <div>
-                        <span className="text-blue-600">Marge : </span>
-                        <span className="font-medium">{getApplicableBareme().marge}%</span>
-                      </div>
-                      <div>
-                        <span className="text-blue-600">VR : </span>
-                        <span className="font-medium">{getApplicableBareme().valeurResiduelle}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="client" className="space-y-6">
@@ -648,52 +699,6 @@ const PropositionForm = () => {
               <CardTitle className="text-lg md:text-xl">Matériel et Composants à financer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <Label htmlFor="fournisseurs">Fournisseur(s) disponibles *</Label>
-                <div className="text-sm text-muted-foreground mb-2">
-                  {leasingType === "standard" && "Tous les fournisseurs sont éligibles"}
-                  {leasingType === "convention" && selectedConvention && 
-                    `Convention "${selectedConvention.nom}" - ${selectedConvention.fournisseurs.length} fournisseur(s) éligible(s)`}
-                  {leasingType === "campagne" && selectedCampagne && 
-                    `Campagne "${selectedCampagne.nom}" - ${selectedCampagne.fournisseurs ? selectedCampagne.fournisseurs.length + ' fournisseur(s)' : 'Tous fournisseurs'} éligible(s)`}
-                </div>
-                <Select 
-                  value=""
-                  onValueChange={(value) => {
-                    if (!selectedFournisseurs.includes(value)) {
-                      setSelectedFournisseurs([...selectedFournisseurs, value]);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un fournisseur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableFournisseurs().map(fournisseur => (
-                      <SelectItem key={fournisseur} value={fournisseur}>
-                        {fournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                {selectedFournisseurs.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedFournisseurs.map((fournisseur) => (
-                      <Badge key={fournisseur} variant="secondary" className="flex items-center gap-1">
-                        {fournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        <button
-                          onClick={() => setSelectedFournisseurs(prev => prev.filter(f => f !== fournisseur))}
-                          className="ml-1 hover:bg-red-100 rounded-full p-0.5"
-                        >
-                          ×
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               <div className="flex gap-2">
                 <Button onClick={() => addMaterialItem(undefined, "materiel")} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
@@ -712,12 +717,12 @@ const PropositionForm = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Type</TableHead>
+                          <TableHead>Type Leasing</TableHead>
+                          <TableHead>Convention/Campagne</TableHead>
                           <TableHead>Fournisseur</TableHead>
                           <TableHead>Référence</TableHead>
                           <TableHead>Désignation</TableHead>
-                          <TableHead>Catégorie</TableHead>
                           <TableHead>Montant HT</TableHead>
-                          <TableHead>Taxe (%)</TableHead>
                           <TableHead>Qté</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
@@ -735,14 +740,74 @@ const PropositionForm = () => {
                             </TableCell>
                             <TableCell>
                               <Select 
+                                value={item.typeLeasingMateriel}
+                                onValueChange={(value: TypeProposition) => updateMaterialItem(item.id, "typeLeasingMateriel", value)}
+                              >
+                                <SelectTrigger className="w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="standard">Standard</SelectItem>
+                                  <SelectItem value="convention">Convention</SelectItem>
+                                  <SelectItem value="campagne">Campagne</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              {item.typeLeasingMateriel === "convention" && (
+                                <Select 
+                                  value={item.selectedConvention?.id || ""}
+                                  onValueChange={(value) => {
+                                    const convention = CONVENTIONS_DISPONIBLES.find(c => c.id === value);
+                                    updateMaterialItem(item.id, "selectedConvention", convention);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-36">
+                                    <SelectValue placeholder="Convention" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CONVENTIONS_DISPONIBLES.filter(c => c.actif).map(conv => (
+                                      <SelectItem key={conv.id} value={conv.id}>{conv.nom}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {item.typeLeasingMateriel === "campagne" && (
+                                <Select 
+                                  value={item.selectedCampagne?.id || ""}
+                                  onValueChange={(value) => {
+                                    const campagne = CAMPAGNES_DISPONIBLES.find(c => c.id === value);
+                                    updateMaterialItem(item.id, "selectedCampagne", campagne);
+                                  }}
+                                >
+                                  <SelectTrigger className="w-36">
+                                    <SelectValue placeholder="Campagne" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {CAMPAGNES_DISPONIBLES.filter(c => isValidCampagne(c)).map(camp => (
+                                      <SelectItem key={camp.id} value={camp.id}>{camp.nom}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              {item.typeLeasingMateriel === "standard" && (
+                                <Badge variant="outline" className="w-36 justify-center">
+                                  Tous fournisseurs
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Select 
                                 value={item.fournisseur}
                                 onValueChange={(value) => updateMaterialItem(item.id, "fournisseur", value)}
+                                disabled={item.typeLeasingMateriel === "convention" && !item.selectedConvention || 
+                                         item.typeLeasingMateriel === "campagne" && !item.selectedCampagne}
                               >
                                 <SelectTrigger className="w-32">
                                   <SelectValue placeholder="Fournisseur" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {selectedFournisseurs.map(f => (
+                                  {getAvailableFournisseurs(item).map(f => (
                                     <SelectItem key={f} value={f}>
                                       {f.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                     </SelectItem>
@@ -751,30 +816,12 @@ const PropositionForm = () => {
                               </Select>
                             </TableCell>
                             <TableCell>
-                              {item.type === "materiel" && item.fournisseur ? (
-                                <Select 
-                                  value={item.reference}
-                                  onValueChange={(value) => updateMaterialItem(item.id, "reference", value)}
-                                >
-                                  <SelectTrigger className="w-24">
-                                    <SelectValue placeholder="Ref" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAvailableMateriels(item.fournisseur).map(materiel => (
-                                      <SelectItem key={materiel.ref} value={materiel.ref}>
-                                        {materiel.ref}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <Input 
-                                  value={item.reference}
-                                  onChange={(e) => updateMaterialItem(item.id, "reference", e.target.value)}
-                                  placeholder="Référence"
-                                  className="w-24"
-                                />
-                              )}
+                              <Input 
+                                value={item.reference}
+                                onChange={(e) => updateMaterialItem(item.id, "reference", e.target.value)}
+                                placeholder="Référence"
+                                className="w-24"
+                              />
                             </TableCell>
                             <TableCell>
                               <Input 
@@ -782,32 +829,7 @@ const PropositionForm = () => {
                                 onChange={(e) => updateMaterialItem(item.id, "designation", e.target.value)}
                                 placeholder="Désignation"
                                 className="w-32"
-                                disabled={item.type === "materiel" && Boolean(item.fournisseur && item.reference)}
                               />
-                            </TableCell>
-                            <TableCell>
-                              <Input 
-                                value={item.categorie}
-                                onChange={(e) => updateMaterialItem(item.id, "categorie", e.target.value)}
-                                placeholder="Catégorie"
-                                className="w-24"
-                                disabled={item.type === "materiel" && Boolean(item.fournisseur && item.reference)}
-                              />
-                              {item.type === "materiel" && item.fournisseur && (
-                                <Select 
-                                  value={item.categorie}
-                                  onValueChange={(value) => updateMaterialItem(item.id, "categorie", value)}
-                                >
-                                  <SelectTrigger className="w-24 mt-1">
-                                    <SelectValue placeholder="Catégorie" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {getAvailableCategories(item.fournisseur).map(cat => (
-                                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
                             </TableCell>
                             <TableCell>
                               <Input 
@@ -816,16 +838,6 @@ const PropositionForm = () => {
                                 onChange={(e) => updateMaterialItem(item.id, "montantHT", e.target.value)}
                                 placeholder="0"
                                 className="w-24"
-                                disabled={item.type === "materiel" && Boolean(item.fournisseur && item.reference)}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input 
-                                type="number"
-                                value={item.taxe}
-                                onChange={(e) => updateMaterialItem(item.id, "taxe", e.target.value)}
-                                placeholder="18"
-                                className="w-16"
                               />
                             </TableCell>
                             <TableCell>
@@ -890,94 +902,30 @@ const PropositionForm = () => {
                     </Table>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h3 className="font-medium text-blue-800 mb-2">Récapitulatif des montants</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Total HT :</span>
-                          <span className="font-medium">
-                            {new Intl.NumberFormat('fr-FR', {
-                              style: 'currency',
-                              currency: 'XOF',
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0
-                            }).format(materialItems.reduce((sum, item) => {
-                              const ht = parseFloat(item.montantHT || "0");
-                              const qty = parseFloat(item.quantite || "1");
-                              return sum + (ht * qty);
-                            }, 0))}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Total TTC :</span>
-                          <span className="font-medium">
-                            {new Intl.NumberFormat('fr-FR', {
-                              style: 'currency',
-                              currency: 'XOF',
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0
-                            }).format(materialItems.reduce((sum, item) => sum + parseFloat(item.prixTotal || "0"), 0))}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Nombre d'articles :</span>
-                          <span className="font-medium">
-                            {materialItems.reduce((sum, item) => sum + parseInt(item.quantite || "0"), 0)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Nombre de lignes :</span>
-                          <span className="font-medium">{materialItems.length}</span>
-                        </div>
+                  {/* Affichage des barèmes appliqués */}
+                  {materialItems.length > 0 && (
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <h3 className="font-medium text-green-800 mb-3">Barèmes appliqués par matériel</h3>
+                      <div className="space-y-2">
+                        {materialItems.map((item) => {
+                          const bareme = getApplicableBareme(item);
+                          return (
+                            <div key={item.id} className="flex items-center justify-between text-sm">
+                              <span className="text-green-700">
+                                {item.type === "materiel" ? "📦" : "🔧"} {item.designation || `${item.type} ${item.id}`}
+                              </span>
+                              <div className="flex gap-4 text-xs">
+                                <span>Type: <strong>{item.typeLeasingMateriel}</strong></span>
+                                <span>Taux: <strong>{bareme.taux}%</strong></span>
+                                <span>Marge: <strong>{bareme.marge}%</strong></span>
+                                <span>VR: <strong>{bareme.valeurResiduelle}%</strong></span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="font-medium text-gray-800 mb-3">Détail des prix</h3>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs">Réf</TableHead>
-                              <TableHead className="text-xs">Montant TTC</TableHead>
-                              <TableHead className="text-xs">Qté</TableHead>
-                              <TableHead className="text-xs">Prix Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {materialItems.map((item) => (
-                              <TableRow key={item.id} className={item.type === "composant" ? "bg-blue-50" : ""}>
-                                <TableCell className="text-xs font-mono">
-                                  {item.parentId && <span className="text-gray-400">└─</span>}
-                                  {item.reference || "-"}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  {new Intl.NumberFormat('fr-FR', {
-                                    style: 'currency',
-                                    currency: 'XOF',
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0
-                                  }).format(parseFloat(item.montantTTC || "0"))}
-                                </TableCell>
-                                <TableCell className="text-xs text-center">
-                                  {item.quantite}
-                                </TableCell>
-                                <TableCell className="text-xs font-medium">
-                                  {new Intl.NumberFormat('fr-FR', {
-                                    style: 'currency',
-                                    currency: 'XOF',
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0
-                                  }).format(parseFloat(item.prixTotal || "0"))}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -993,32 +941,6 @@ const PropositionForm = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-green-50 p-4 rounded-lg mb-4">
-                <h3 className="font-medium text-green-800 mb-2">
-                  Barème appliqué : {leasingType === "standard" ? "Standard" : 
-                    leasingType === "convention" ? selectedConvention?.nom : selectedCampagne?.nom}
-                </h3>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-green-600">Taux : </span>
-                    <span className="font-medium">{getApplicableBareme().taux}%</span>
-                  </div>
-                  <div>
-                    <span className="text-green-600">Marge : </span>
-                    <span className="font-medium">{getApplicableBareme().marge}%</span>
-                  </div>
-                  <div>
-                    <span className="text-green-600">Valeur Résiduelle : </span>
-                    <span className="font-medium">{getApplicableBareme().valeurResiduelle}%</span>
-                  </div>
-                </div>
-                {leasingType === "campagne" && (
-                  <div className="mt-2 text-xs text-red-600 font-medium">
-                    ⚡ Barème prioritaire - appliqué automatiquement
-                  </div>
-                )}
-              </div>
-
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="periodiciteLoyer">Périodicité loyer *</Label>
@@ -1157,7 +1079,7 @@ const PropositionForm = () => {
           <AmortizationTable 
             montant={parseFloat(formData.montantTTC) || 50000000}
             duree={parseInt(formData.nombrePeriodes) || 36}
-            taux={getApplicableBareme().taux}
+            taux={7.5}
           />
           
           <div className="flex flex-col md:flex-row gap-4 pt-4">
