@@ -14,10 +14,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/datepicker";
-import { Save, Send, Calculator, Users, Building, CheckCircle, Plus, Trash2, Loader2, Minus } from "lucide-react";
+import { Save, Send, Calculator, Users, Building, CheckCircle, Plus, Trash2, Loader2, Minus, ArrowLeft } from "lucide-react";
 import { usePropositionActions } from "@/hooks/usePropositionActions";
 import QuickSimulator from "./QuickSimulator";
 import AmortizationTable from "./AmortizationTable";
+import LeasingTypeSelector from "./LeasingTypeSelector";
+import ConventionSelector from "./ConventionSelector";
+import CampagneSelector from "./CampagneSelector";
+import { TypeProposition, Convention, Campagne } from "@/types/leasing";
 import {
   Table,
   TableBody,
@@ -71,9 +75,11 @@ const MATERIELS_DISPONIBLES = {
 };
 
 const PropositionForm = () => {
-  const [currentTab, setCurrentTab] = useState("type-client");
+  const [currentTab, setCurrentTab] = useState("type-leasing");
   const [clientType, setClientType] = useState<"Client" | "Prospect" | null>(null);
-  const [baremeType, setBaremeType] = useState<"standard" | "derogatoire">("standard");
+  const [leasingType, setLeasingType] = useState<TypeProposition | null>(null);
+  const [selectedConvention, setSelectedConvention] = useState<Convention | null>(null);
+  const [selectedCampagne, setSelectedCampagne] = useState<Campagne | null>(null);
   const { saveAsDraft, sendForValidation, isLoading } = usePropositionActions();
   
   // État pour les matériels et composants
@@ -81,7 +87,6 @@ const PropositionForm = () => {
   const [selectedFournisseurs, setSelectedFournisseurs] = useState<string[]>([]);
   
   const [formData, setFormData] = useState({
-    // Informations client
     typeLocataire: "",
     numClient: "",
     nomClient: "",
@@ -92,16 +97,14 @@ const PropositionForm = () => {
     categorieJuridiqueClient: "",
     secteurActivite: "",
     identifiantNational: "",
-    adresseClient: "", // Déplacé à la fin
+    adresseClient: "",
     
-    // Données générales - Produit d'abord
     produit: "",
     codeProduit: "",
     dateDemande: new Date(),
     dateMiseEnService: undefined as Date | undefined,
     agence: "",
     
-    // Matériel (ex-Objet financé)
     referenceMateriel: "",
     designation: "",
     montantHT: "",
@@ -111,7 +114,6 @@ const PropositionForm = () => {
     fournisseur: "",
     adresseLivraison: "",
 
-    // Barèmes
     typeBareme: "standard",
     periodiciteLoyer: "",
     terme: "",
@@ -124,7 +126,6 @@ const PropositionForm = () => {
     valeurResiduelle: "",
     montantVR: "",
 
-    // Prestations
     fraisAssurance: "",
     fraisDossier: "",
     fraisTimbre: ""
@@ -137,7 +138,6 @@ const PropositionForm = () => {
   const handleProductChange = (productValue: string) => {
     updateFormData("produit", productValue);
     
-    // Auto-remplir le code produit selon le produit sélectionné
     const productCodes: { [key: string]: string } = {
       "credit-bail": "CB001",
       "cession-bail": "CS001", 
@@ -175,7 +175,6 @@ const PropositionForm = () => {
   };
 
   const removeMaterialItem = (id: number) => {
-    // Supprimer l'item et tous ses composants
     const itemsToRemove = [id];
     const findChildren = (parentId: number) => {
       materialItems.forEach(item => {
@@ -195,7 +194,6 @@ const PropositionForm = () => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
         
-        // Si on change la désignation, auto-remplir les champs
         if (field === 'designation' && item.fournisseur && item.categorie && item.type === 'materiel') {
           const fournisseurData = MATERIELS_DISPONIBLES[item.fournisseur as keyof typeof MATERIELS_DISPONIBLES];
           const materielData = fournisseurData?.find(m => m.designation === value && m.categorie === item.categorie);
@@ -205,14 +203,12 @@ const PropositionForm = () => {
           }
         }
         
-        // Reset des champs dépendants quand on change la catégorie
         if (field === 'categorie') {
           updatedItem.designation = '';
           updatedItem.reference = '';
           updatedItem.montantHT = '';
         }
         
-        // Reset de la désignation quand on change le fournisseur
         if (field === 'fournisseur') {
           updatedItem.categorie = '';
           updatedItem.designation = '';
@@ -220,7 +216,6 @@ const PropositionForm = () => {
           updatedItem.montantHT = '';
         }
         
-        // Calcul auto du montant TTC et prix total
         if (field === 'montantHT' || field === 'taxe' || field === 'quantite') {
           const ht = parseFloat(updatedItem.montantHT || "0");
           const tax = parseFloat(updatedItem.taxe || "0");
@@ -259,6 +254,31 @@ const PropositionForm = () => {
     return materiels.filter(m => m.categorie === categorie);
   };
 
+  // Fonction pour obtenir les fournisseurs disponibles selon le type de leasing
+  const getAvailableFournisseurs = () => {
+    if (leasingType === "standard") {
+      return Object.keys(MATERIELS_DISPONIBLES);
+    }
+    if (leasingType === "convention" && selectedConvention) {
+      return selectedConvention.fournisseurs;
+    }
+    if (leasingType === "campagne" && selectedCampagne) {
+      return selectedCampagne.fournisseurs || Object.keys(MATERIELS_DISPONIBLES);
+    }
+    return [];
+  };
+
+  // Fonction pour obtenir le barème applicable
+  const getApplicableBareme = () => {
+    if (leasingType === "campagne" && selectedCampagne) {
+      return selectedCampagne.bareme;
+    }
+    if (leasingType === "convention" && selectedConvention) {
+      return selectedConvention.bareme;
+    }
+    return { taux: 7.5, marge: 3.0, valeurResiduelle: 2.0 }; // Standard
+  };
+
   const handleSaveAsDraft = async () => {
     try {
       const propositionData = {
@@ -266,7 +286,10 @@ const PropositionForm = () => {
         materialItems,
         selectedFournisseurs,
         clientType,
-        baremeType
+        leasingType,
+        selectedConvention,
+        selectedCampagne,
+        baremeApplique: getApplicableBareme()
       };
       await saveAsDraft(propositionData);
     } catch (error) {
@@ -281,7 +304,10 @@ const PropositionForm = () => {
         materialItems,
         selectedFournisseurs,
         clientType,
-        baremeType
+        leasingType,
+        selectedConvention,
+        selectedCampagne,
+        baremeApplique: getApplicableBareme()
       };
       await sendForValidation(propositionData);
     } catch (error) {
@@ -342,7 +368,7 @@ const PropositionForm = () => {
 
       {clientType && (
         <Button 
-          onClick={() => setCurrentTab("client")}
+          onClick={() => setCurrentTab("type-leasing")}
           className="mt-6 w-full md:w-auto"
         >
           Continuer avec {clientType}
@@ -355,9 +381,10 @@ const PropositionForm = () => {
     <div className="max-w-7xl mx-auto px-4 md:px-6">
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
         <div className="overflow-x-auto">
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 min-w-[600px] md:min-w-full">
-            <TabsTrigger value="type-client" className="text-xs">Type</TabsTrigger>
-            <TabsTrigger value="client" disabled={!clientType} className="text-xs">1. Client</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 min-w-[700px] md:min-w-full">
+            <TabsTrigger value="type-client" className="text-xs">Type Client</TabsTrigger>
+            <TabsTrigger value="type-leasing" disabled={!clientType} className="text-xs">Type Leasing</TabsTrigger>
+            <TabsTrigger value="client" disabled={!leasingType} className="text-xs">1. Client</TabsTrigger>
             <TabsTrigger value="general" className="text-xs">2. Général</TabsTrigger>
             <TabsTrigger value="materiel" className="text-xs">3. Matériel</TabsTrigger>
             <TabsTrigger value="baremes" className="text-xs">4. Barèmes</TabsTrigger>
@@ -368,6 +395,66 @@ const PropositionForm = () => {
 
         <TabsContent value="type-client">
           {renderClientTypeSelection()}
+        </TabsContent>
+
+        <TabsContent value="type-leasing">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg md:text-xl">Type de proposition de leasing</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <LeasingTypeSelector
+                selectedType={leasingType}
+                onTypeSelect={setLeasingType}
+                onContinue={() => setCurrentTab("client")}
+              />
+
+              {leasingType === "convention" && (
+                <div className="pt-6 border-t">
+                  <ConventionSelector
+                    selectedConvention={selectedConvention}
+                    onConventionSelect={setSelectedConvention}
+                  />
+                </div>
+              )}
+
+              {leasingType === "campagne" && (
+                <div className="pt-6 border-t">
+                  <CampagneSelector
+                    selectedCampagne={selectedCampagne}
+                    onCampagneSelect={setSelectedCampagne}
+                  />
+                </div>
+              )}
+
+              {leasingType && (leasingType === "standard" || 
+                (leasingType === "convention" && selectedConvention) || 
+                (leasingType === "campagne" && selectedCampagne)) && (
+                <div className="pt-4 border-t">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">
+                      Barème sélectionné : {leasingType === "standard" ? "Standard" : 
+                        leasingType === "convention" ? selectedConvention?.nom : selectedCampagne?.nom}
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-600">Taux : </span>
+                        <span className="font-medium">{getApplicableBareme().taux}%</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600">Marge : </span>
+                        <span className="font-medium">{getApplicableBareme().marge}%</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-600">VR : </span>
+                        <span className="font-medium">{getApplicableBareme().valeurResiduelle}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="client" className="space-y-6">
@@ -476,7 +563,6 @@ const PropositionForm = () => {
                 </div>
               </div>
 
-              {/* Adresse déplacée à la fin */}
               <div>
                 <Label htmlFor="adresseClient">Adresse Client *</Label>
                 <Textarea 
@@ -496,7 +582,6 @@ const PropositionForm = () => {
               <CardTitle className="text-lg md:text-xl">Données générales de la proposition</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Produit d'abord */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="produit">Produit *</Label>
@@ -563,9 +648,15 @@ const PropositionForm = () => {
               <CardTitle className="text-lg md:text-xl">Matériel et Composants à financer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Sélection des fournisseurs */}
               <div>
-                <Label htmlFor="fournisseurs">Fournisseur(s) *</Label>
+                <Label htmlFor="fournisseurs">Fournisseur(s) disponibles *</Label>
+                <div className="text-sm text-muted-foreground mb-2">
+                  {leasingType === "standard" && "Tous les fournisseurs sont éligibles"}
+                  {leasingType === "convention" && selectedConvention && 
+                    `Convention "${selectedConvention.nom}" - ${selectedConvention.fournisseurs.length} fournisseur(s) éligible(s)`}
+                  {leasingType === "campagne" && selectedCampagne && 
+                    `Campagne "${selectedCampagne.nom}" - ${selectedCampagne.fournisseurs ? selectedCampagne.fournisseurs.length + ' fournisseur(s)' : 'Tous fournisseurs'} éligible(s)`}
+                </div>
                 <Select 
                   value=""
                   onValueChange={(value) => {
@@ -578,11 +669,11 @@ const PropositionForm = () => {
                     <SelectValue placeholder="Sélectionner un fournisseur" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="babacar-fils">Entreprise Babacar & Fils</SelectItem>
-                    <SelectItem value="sonacos">SONACOS SA</SelectItem>
-                    <SelectItem value="senegal-auto">Sénégal Auto</SelectItem>
-                    <SelectItem value="dakar-equipement">Dakar Équipement</SelectItem>
-                    <SelectItem value="afrique-materiel">Afrique Matériel</SelectItem>
+                    {getAvailableFournisseurs().map(fournisseur => (
+                      <SelectItem key={fournisseur} value={fournisseur}>
+                        {fournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 
@@ -590,7 +681,7 @@ const PropositionForm = () => {
                   <div className="flex flex-wrap gap-2 mt-2">
                     {selectedFournisseurs.map((fournisseur) => (
                       <Badge key={fournisseur} variant="secondary" className="flex items-center gap-1">
-                        {fournisseur}
+                        {fournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         <button
                           onClick={() => setSelectedFournisseurs(prev => prev.filter(f => f !== fournisseur))}
                           className="ml-1 hover:bg-red-100 rounded-full p-0.5"
@@ -603,7 +694,6 @@ const PropositionForm = () => {
                 )}
               </div>
 
-              {/* Boutons d'ajout */}
               <div className="flex gap-2">
                 <Button onClick={() => addMaterialItem(undefined, "materiel")} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
@@ -615,7 +705,6 @@ const PropositionForm = () => {
                 </Button>
               </div>
 
-              {/* Tableau des matériels et composants - VERSION COMPACTE */}
               {materialItems.length > 0 && (
                 <div className="space-y-4">
                   <div className="overflow-x-auto">
@@ -654,7 +743,9 @@ const PropositionForm = () => {
                                 </SelectTrigger>
                                 <SelectContent>
                                   {selectedFournisseurs.map(f => (
-                                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                                    <SelectItem key={f} value={f}>
+                                      {f.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -799,9 +890,7 @@ const PropositionForm = () => {
                     </Table>
                   </div>
 
-                  {/* Disposition en grille: récapitulatif à gauche, tableau des prix à droite */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Récapitulatif des montants */}
                     <div className="bg-blue-50 p-4 rounded-lg">
                       <h3 className="font-medium text-blue-800 mb-2">Récapitulatif des montants</h3>
                       <div className="space-y-2 text-sm">
@@ -844,7 +933,6 @@ const PropositionForm = () => {
                       </div>
                     </div>
 
-                    {/* Tableau des prix détaillés */}
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <h3 className="font-medium text-gray-800 mb-3">Détail des prix</h3>
                       <div className="overflow-x-auto">
@@ -905,34 +993,30 @@ const PropositionForm = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Sélection du type de barème */}
-              <div className="flex flex-col md:flex-row gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="standard"
-                    name="baremeType"
-                    checked={baremeType === "standard"}
-                    onChange={() => {
-                      setBaremeType("standard");
-                      updateFormData("typeBareme", "standard");
-                    }}
-                  />
-                  <Label htmlFor="standard" className="cursor-pointer">Barème Standard</Label>
+              <div className="bg-green-50 p-4 rounded-lg mb-4">
+                <h3 className="font-medium text-green-800 mb-2">
+                  Barème appliqué : {leasingType === "standard" ? "Standard" : 
+                    leasingType === "convention" ? selectedConvention?.nom : selectedCampagne?.nom}
+                </h3>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-green-600">Taux : </span>
+                    <span className="font-medium">{getApplicableBareme().taux}%</span>
+                  </div>
+                  <div>
+                    <span className="text-green-600">Marge : </span>
+                    <span className="font-medium">{getApplicableBareme().marge}%</span>
+                  </div>
+                  <div>
+                    <span className="text-green-600">Valeur Résiduelle : </span>
+                    <span className="font-medium">{getApplicableBareme().valeurResiduelle}%</span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    id="derogatoire"
-                    name="baremeType"
-                    checked={baremeType === "derogatoire"}
-                    onChange={() => {
-                      setBaremeType("derogatoire");
-                      updateFormData("typeBareme", "derogatoire");
-                    }}
-                  />
-                  <Label htmlFor="derogatoire" className="cursor-pointer">Barème Dérogatoire</Label>
-                </div>
+                {leasingType === "campagne" && (
+                  <div className="mt-2 text-xs text-red-600 font-medium">
+                    ⚡ Barème prioritaire - appliqué automatiquement
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -984,74 +1068,6 @@ const PropositionForm = () => {
                   </Select>
                 </div>
               </div>
-              
-              {baremeType === "standard" ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="tauxStandards">Taux standards (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      value="7.50"
-                      disabled
-                      className="bg-white"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="margeStandard">Marge standard (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      value="3.00"
-                      disabled
-                      className="bg-white"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="valeurResiduelleSt">Valeur Résiduelle (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      value="2.00"
-                      disabled
-                      className="bg-white"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-orange-50 rounded-lg">
-                  <div>
-                    <Label htmlFor="tauxClient">Taux client négocié (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="Ex: 6.50" 
-                      value={formData.tauxClient}
-                      onChange={(e) => updateFormData("tauxClient", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="margeNominale">Marge négociée (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="Ex: 2.50" 
-                      value={formData.margeNominale}
-                      onChange={(e) => updateFormData("margeNominale", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="valeurResiduelle">Valeur Résiduelle (%)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="Ex: 1.50" 
-                      value={formData.valeurResiduelle}
-                      onChange={(e) => updateFormData("valeurResiduelle", e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1141,7 +1157,7 @@ const PropositionForm = () => {
           <AmortizationTable 
             montant={parseFloat(formData.montantTTC) || 50000000}
             duree={parseInt(formData.nombrePeriodes) || 36}
-            taux={parseFloat(formData.tauxClient || formData.tauxStandards) || 7.5}
+            taux={getApplicableBareme().taux}
           />
           
           <div className="flex flex-col md:flex-row gap-4 pt-4">
