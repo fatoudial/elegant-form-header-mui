@@ -8,6 +8,8 @@ import Index from "./pages/Index";
 import Tiers from "./pages/Tiers";
 import Propositions from "./pages/Propositions";
 import Contrats from "./pages/Contrats";
+import Conventions from "./pages/Conventions";
+import Campagnes from "./pages/Campagnes";
 import MonCompte from "./pages/MonCompte";
 import NotFound from "./pages/NotFound";
 
@@ -24,6 +26,8 @@ const App = () => (
           <Route path="/tiers" element={<Tiers />} />
           <Route path="/propositions" element={<Propositions />} />
           <Route path="/contrats" element={<Contrats />} />
+          <Route path="/conventions" element={<Conventions />} />
+          <Route path="/campagnes" element={<Campagnes />} />
           <Route path="/compte" element={<MonCompte />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

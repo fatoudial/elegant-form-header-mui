@@ -19,6 +19,9 @@ import { usePropositionActions } from "@/hooks/usePropositionActions";
 import QuickSimulator from "./QuickSimulator";
 import AmortizationTable from "./AmortizationTable";
 import { TypeProposition, Convention, Campagne } from "@/types/leasing";
+import LeasingTypeSelector from "./LeasingTypeSelector";
+import ConventionSelector from "./ConventionSelector";
+import CampagneSelector from "./CampagneSelector";
 import {
   Table,
   TableBody,
@@ -32,9 +35,6 @@ interface MaterialItem {
   id: number;
   type: "materiel" | "composant";
   parentId?: number;
-  typeLeasingMateriel: TypeProposition;
-  selectedConvention?: Convention;
-  selectedCampagne?: Campagne;
   fournisseur: string;
   reference: string;
   designation: string;
@@ -173,6 +173,12 @@ const MATERIELS_DISPONIBLES = {
 const PropositionForm = () => {
   const [currentTab, setCurrentTab] = useState("type-client");
   const [clientType, setClientType] = useState<"Client" | "Prospect" | null>(null);
+  
+  // États pour le type de proposition global
+  const [typeProposition, setTypeProposition] = useState<TypeProposition | null>(null);
+  const [selectedConvention, setSelectedConvention] = useState<Convention | null>(null);
+  const [selectedCampagne, setSelectedCampagne] = useState<Campagne | null>(null);
+  
   const { saveAsDraft, sendForValidation, isLoading } = usePropositionActions();
   
   // État pour les matériels et composants
@@ -241,17 +247,35 @@ const PropositionForm = () => {
     updateFormData("codeProduit", productCodes[productValue] || "");
   };
 
+  // Fonction pour obtenir les fournisseurs disponibles selon le type de proposition
+  const getAvailableFournisseurs = () => {
+    if (typeProposition === "convention" && selectedConvention) {
+      return selectedConvention.fournisseurs;
+    }
+    if (typeProposition === "campagne" && selectedCampagne) {
+      return selectedCampagne.fournisseurs || Object.keys(MATERIELS_DISPONIBLES);
+    }
+    return Object.keys(MATERIELS_DISPONIBLES); // Standard - tous les fournisseurs
+  };
+
+  // Fonction pour obtenir le barème applicable
+  const getApplicableBareme = () => {
+    if (typeProposition === "campagne" && selectedCampagne) {
+      return selectedCampagne.bareme;
+    }
+    if (typeProposition === "convention" && selectedConvention) {
+      return selectedConvention.bareme;
+    }
+    return { taux: 7.5, marge: 3.0, valeurResiduelle: 2.0 }; // Standard
+  };
+
   const addMaterialItem = (parentId?: number, type: "materiel" | "composant" = "materiel") => {
     const newId = Math.max(0, ...materialItems.map(m => m.id)) + 1;
-    const parentItem = parentId ? materialItems.find(m => m.id === parentId) : null;
     
     const newItem: MaterialItem = {
       id: newId,
       type: type,
       parentId: parentId,
-      typeLeasingMateriel: "standard",
-      selectedConvention: undefined,
-      selectedCampagne: undefined,
       fournisseur: "",
       reference: "",
       designation: "",
@@ -288,26 +312,6 @@ const PropositionForm = () => {
     setMaterialItems(prev => prev.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
-        
-        // Reset dependent fields when leasing type changes
-        if (field === 'typeLeasingMateriel') {
-          updatedItem.selectedConvention = undefined;
-          updatedItem.selectedCampagne = undefined;
-          updatedItem.fournisseur = "";
-          updatedItem.reference = "";
-          updatedItem.designation = "";
-          updatedItem.categorie = "";
-          updatedItem.montantHT = "";
-        }
-        
-        // Reset fournisseur when convention/campagne changes
-        if (field === 'selectedConvention' || field === 'selectedCampagne') {
-          updatedItem.fournisseur = "";
-          updatedItem.reference = "";
-          updatedItem.designation = "";
-          updatedItem.categorie = "";
-          updatedItem.montantHT = "";
-        }
         
         if (field === 'designation' && item.fournisseur && item.categorie && item.type === 'materiel') {
           const fournisseurData = MATERIELS_DISPONIBLES[item.fournisseur as keyof typeof MATERIELS_DISPONIBLES];
@@ -347,35 +351,6 @@ const PropositionForm = () => {
     }));
   };
 
-  // Fonction pour obtenir les fournisseurs disponibles selon le type de leasing du matériel
-  const getAvailableFournisseurs = (item: MaterialItem) => {
-    if (item.typeLeasingMateriel === "standard") {
-      return Object.keys(MATERIELS_DISPONIBLES);
-    }
-    if (item.typeLeasingMateriel === "convention" && item.selectedConvention) {
-      return item.selectedConvention.fournisseurs;
-    }
-    if (item.typeLeasingMateriel === "campagne" && item.selectedCampagne) {
-      return item.selectedCampagne.fournisseurs || Object.keys(MATERIELS_DISPONIBLES);
-    }
-    return [];
-  };
-
-  // Fonction pour obtenir le barème applicable pour un matériel
-  const getApplicableBareme = (item: MaterialItem) => {
-    if (item.typeLeasingMateriel === "campagne" && item.selectedCampagne) {
-      return item.selectedCampagne.bareme;
-    }
-    if (item.typeLeasingMateriel === "convention" && item.selectedConvention) {
-      return item.selectedConvention.bareme;
-    }
-    return { taux: 7.5, marge: 3.0, valeurResiduelle: 2.0 }; // Standard
-  };
-
-  const getChildrenItems = (parentId: number) => {
-    return materialItems.filter(item => item.parentId === parentId);
-  };
-
   const canAddComponent = (item: MaterialItem) => {
     return item.type === "materiel";
   };
@@ -406,7 +381,10 @@ const PropositionForm = () => {
       const propositionData = {
         ...formData,
         materialItems,
-        clientType
+        clientType,
+        typeProposition,
+        selectedConvention,
+        selectedCampagne
       };
       await saveAsDraft(propositionData);
     } catch (error) {
@@ -419,7 +397,10 @@ const PropositionForm = () => {
       const propositionData = {
         ...formData,
         materialItems,
-        clientType
+        clientType,
+        typeProposition,
+        selectedConvention,
+        selectedCampagne
       };
       await sendForValidation(propositionData);
     } catch (error) {
@@ -480,7 +461,7 @@ const PropositionForm = () => {
 
       {clientType && (
         <Button 
-          onClick={() => setCurrentTab("client")}
+          onClick={() => setCurrentTab("type-proposition")}
           className="mt-6 w-full md:w-auto"
         >
           Continuer avec {clientType}
@@ -493,9 +474,10 @@ const PropositionForm = () => {
     <div className="max-w-7xl mx-auto px-4 md:px-6">
       <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
         <div className="overflow-x-auto">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 min-w-[500px] md:min-w-full">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-7 min-w-[600px] md:min-w-full">
             <TabsTrigger value="type-client" className="text-xs">Type Client</TabsTrigger>
-            <TabsTrigger value="client" disabled={!clientType} className="text-xs">1. Client</TabsTrigger>
+            <TabsTrigger value="type-proposition" disabled={!clientType} className="text-xs">Type Proposition</TabsTrigger>
+            <TabsTrigger value="client" disabled={!typeProposition} className="text-xs">1. Client</TabsTrigger>
             <TabsTrigger value="general" className="text-xs">2. Général</TabsTrigger>
             <TabsTrigger value="materiel" className="text-xs">3. Matériel</TabsTrigger>
             <TabsTrigger value="baremes" className="text-xs">4. Barèmes</TabsTrigger>
@@ -506,6 +488,52 @@ const PropositionForm = () => {
 
         <TabsContent value="type-client">
           {renderClientTypeSelection()}
+        </TabsContent>
+
+        <TabsContent value="type-proposition">
+          <div className="space-y-6">
+            <LeasingTypeSelector
+              selectedType={typeProposition}
+              onTypeSelect={setTypeProposition}
+              onContinue={() => {
+                if (typeProposition === "convention") {
+                  // Afficher sélecteur de convention
+                } else if (typeProposition === "campagne") {
+                  // Afficher sélecteur de campagne
+                } else {
+                  setCurrentTab("client");
+                }
+              }}
+            />
+            
+            {typeProposition === "convention" && (
+              <div className="space-y-4">
+                <ConventionSelector
+                  selectedConvention={selectedConvention}
+                  onConventionSelect={setSelectedConvention}
+                />
+                {selectedConvention && (
+                  <Button onClick={() => setCurrentTab("client")} className="w-full">
+                    Continuer avec la convention "{selectedConvention.nom}"
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {typeProposition === "campagne" && (
+              <div className="space-y-4">
+                <CampagneSelector
+                  selectedCampagne={selectedCampagne}
+                  onCampagneSelect={setSelectedCampagne}
+                />
+                {selectedCampagne && (
+                  <Button onClick={() => setCurrentTab("client")} className="w-full">
+                    Continuer avec la campagne "{selectedCampagne.nom}"
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="client" className="space-y-6">
@@ -697,6 +725,20 @@ const PropositionForm = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg md:text-xl">Matériel et Composants à financer</CardTitle>
+              {(typeProposition === "convention" && selectedConvention) && (
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-sm text-green-700">
+                    📋 <strong>Convention "{selectedConvention.nom}" :</strong> Seuls les fournisseurs partenaires sont disponibles
+                  </p>
+                </div>
+              )}
+              {(typeProposition === "campagne" && selectedCampagne) && (
+                <div className="bg-red-50 p-3 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    🎯 <strong>Campagne "{selectedCampagne.nom}" :</strong> Taux exceptionnel de {selectedCampagne.bareme.taux}% (prioritaire)
+                  </p>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex gap-2">
@@ -717,8 +759,6 @@ const PropositionForm = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Type</TableHead>
-                          <TableHead>Type Leasing</TableHead>
-                          <TableHead>Convention/Campagne</TableHead>
                           <TableHead>Fournisseur</TableHead>
                           <TableHead>Référence</TableHead>
                           <TableHead>Désignation</TableHead>
@@ -740,74 +780,14 @@ const PropositionForm = () => {
                             </TableCell>
                             <TableCell>
                               <Select 
-                                value={item.typeLeasingMateriel}
-                                onValueChange={(value: TypeProposition) => updateMaterialItem(item.id, "typeLeasingMateriel", value)}
-                              >
-                                <SelectTrigger className="w-28">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="standard">Standard</SelectItem>
-                                  <SelectItem value="convention">Convention</SelectItem>
-                                  <SelectItem value="campagne">Campagne</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              {item.typeLeasingMateriel === "convention" && (
-                                <Select 
-                                  value={item.selectedConvention?.id || ""}
-                                  onValueChange={(value) => {
-                                    const convention = CONVENTIONS_DISPONIBLES.find(c => c.id === value);
-                                    updateMaterialItem(item.id, "selectedConvention", convention);
-                                  }}
-                                >
-                                  <SelectTrigger className="w-36">
-                                    <SelectValue placeholder="Convention" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {CONVENTIONS_DISPONIBLES.filter(c => c.actif).map(conv => (
-                                      <SelectItem key={conv.id} value={conv.id}>{conv.nom}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                              {item.typeLeasingMateriel === "campagne" && (
-                                <Select 
-                                  value={item.selectedCampagne?.id || ""}
-                                  onValueChange={(value) => {
-                                    const campagne = CAMPAGNES_DISPONIBLES.find(c => c.id === value);
-                                    updateMaterialItem(item.id, "selectedCampagne", campagne);
-                                  }}
-                                >
-                                  <SelectTrigger className="w-36">
-                                    <SelectValue placeholder="Campagne" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {CAMPAGNES_DISPONIBLES.filter(c => isValidCampagne(c)).map(camp => (
-                                      <SelectItem key={camp.id} value={camp.id}>{camp.nom}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
-                              {item.typeLeasingMateriel === "standard" && (
-                                <Badge variant="outline" className="w-36 justify-center">
-                                  Tous fournisseurs
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Select 
                                 value={item.fournisseur}
                                 onValueChange={(value) => updateMaterialItem(item.id, "fournisseur", value)}
-                                disabled={item.typeLeasingMateriel === "convention" && !item.selectedConvention || 
-                                         item.typeLeasingMateriel === "campagne" && !item.selectedCampagne}
                               >
                                 <SelectTrigger className="w-32">
                                   <SelectValue placeholder="Fournisseur" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {getAvailableFournisseurs(item).map(f => (
+                                  {getAvailableFournisseurs().map(f => (
                                     <SelectItem key={f} value={f}>
                                       {f.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                     </SelectItem>
@@ -902,30 +882,19 @@ const PropositionForm = () => {
                     </Table>
                   </div>
 
-                  {/* Affichage des barèmes appliqués */}
-                  {materialItems.length > 0 && (
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <h3 className="font-medium text-green-800 mb-3">Barèmes appliqués par matériel</h3>
-                      <div className="space-y-2">
-                        {materialItems.map((item) => {
-                          const bareme = getApplicableBareme(item);
-                          return (
-                            <div key={item.id} className="flex items-center justify-between text-sm">
-                              <span className="text-green-700">
-                                {item.type === "materiel" ? "📦" : "🔧"} {item.designation || `${item.type} ${item.id}`}
-                              </span>
-                              <div className="flex gap-4 text-xs">
-                                <span>Type: <strong>{item.typeLeasingMateriel}</strong></span>
-                                <span>Taux: <strong>{bareme.taux}%</strong></span>
-                                <span>Marge: <strong>{bareme.marge}%</strong></span>
-                                <span>VR: <strong>{bareme.valeurResiduelle}%</strong></span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                  {/* Affichage du barème appliqué */}
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h3 className="font-medium text-green-800 mb-3">Barème appliqué</h3>
+                    <div className="flex gap-4 text-sm text-green-700">
+                      <span>Type: <strong>{typeProposition || "Standard"}</strong></span>
+                      <span>Taux: <strong>{getApplicableBareme().taux}%</strong></span>
+                      <span>Marge: <strong>{getApplicableBareme().marge}%</strong></span>
+                      <span>VR: <strong>{getApplicableBareme().valeurResiduelle}%</strong></span>
                     </div>
-                  )}
+                    {typeProposition === "campagne" && (
+                      <p className="text-xs text-red-600 mt-2">⚡ Campagne prioritaire - Taux exceptionnel appliqué</p>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -1079,7 +1048,7 @@ const PropositionForm = () => {
           <AmortizationTable 
             montant={parseFloat(formData.montantTTC) || 50000000}
             duree={parseInt(formData.nombrePeriodes) || 36}
-            taux={7.5}
+            taux={getApplicableBareme().taux}
           />
           
           <div className="flex flex-col md:flex-row gap-4 pt-4">
