@@ -1,23 +1,20 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Convention } from "@/types/leasing";
-import { Building2, Calendar, Percent } from "lucide-react";
+import { CheckCircle, Calendar, Users } from "lucide-react";
 
-interface ConventionSelectorProps {
-  selectedConvention: Convention | null;
-  onConventionSelect: (convention: Convention) => void;
-}
-
-// Données de démonstration pour les conventions
-const CONVENTIONS_DISPONIBLES: Convention[] = [
+// Updated demo data to match the new Convention interface
+const CONVENTIONS_DEMO: Convention[] = [
   {
-    id: "conv-vehicules-pro",
-    nom: "Véhicules Professionnels",
-    description: "Convention dédiée aux véhicules utilitaires et professionnels",
+    id: "conv-vehicules-001",
+    nom: "Véhicules Professionnels 2024",
+    description: "Convention dédiée aux véhicules utilitaires et professionnels avec conditions préférentielles",
     fournisseurs: ["babacar-fils", "senegal-auto"],
+    prestatairesMaintenace: ["garage-centrale", "maintenance-rapide"],
+    categoriesMateriels: ["vehicules-utilitaires", "camions"],
     bareme: {
       taux: 6.5,
       marge: 2.8,
@@ -25,105 +22,152 @@ const CONVENTIONS_DISPONIBLES: Convention[] = [
     },
     dateDebut: new Date("2024-01-01"),
     dateFin: new Date("2024-12-31"),
-    actif: true
+    reconductionTacite: true,
+    actif: true,
+    statut: "active"
   },
   {
-    id: "conv-equipement-industriel",
-    nom: "Équipement Industriel",
-    description: "Convention pour les machines et équipements industriels",
+    id: "conv-equipement-002",
+    nom: "Équipement Industriel Premium",
+    description: "Convention pour les machines et équipements industriels haute gamme",
     fournisseurs: ["sonacos", "afrique-materiel"],
+    prestatairesMaintenace: ["techno-maintenance"],
+    categoriesMateriels: ["machines-industrielles", "equipement-production"],
     bareme: {
       taux: 6.0,
       marge: 2.5,
       valeurResiduelle: 2.0
     },
     dateDebut: new Date("2024-01-01"),
-    actif: true
+    reconductionTacite: false,
+    actif: true,
+    statut: "active"
   },
   {
-    id: "conv-btp",
-    nom: "BTP & Construction",
-    description: "Convention spécialisée dans les équipements de construction",
-    fournisseurs: ["dakar-equipement"],
+    id: "conv-agriculture-003",
+    nom: "Matériel Agricole Spécialisé",
+    description: "Convention spécialisée pour les équipements agricoles et agroalimentaires",
+    fournisseurs: ["agri-senegal"],
+    prestatairesMaintenace: ["maintenance-agricole", "techno-maintenance"],
+    categoriesMateriels: ["tracteurs", "moissonneuses", "equipement-agricole"],
     bareme: {
       taux: 6.8,
-      marge: 3.0,
+      marge: 3.2,
       valeurResiduelle: 1.5
     },
     dateDebut: new Date("2024-01-01"),
     dateFin: new Date("2024-12-31"),
-    actif: true
+    reconductionTacite: true,
+    actif: true,
+    statut: "active"
   }
 ];
 
+interface ConventionSelectorProps {
+  selectedConvention: Convention | null;
+  onConventionSelect: (convention: Convention) => void;
+}
+
 const ConventionSelector = ({ selectedConvention, onConventionSelect }: ConventionSelectorProps) => {
+  const [selectedFournisseur, setSelectedFournisseur] = useState<string>("");
+
+  const fournisseurs = Array.from(
+    new Set(CONVENTIONS_DEMO.flatMap(conv => conv.fournisseurs))
+  );
+
+  const filteredConventions = selectedFournisseur
+    ? CONVENTIONS_DEMO.filter(conv => conv.fournisseurs.includes(selectedFournisseur))
+    : CONVENTIONS_DEMO;
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Sélectionner une convention</h3>
-        <p className="text-sm text-muted-foreground">
-          Choisissez la convention de leasing qui correspond à votre besoin
-        </p>
-      </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Sélection du Fournisseur
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {fournisseurs.map(fournisseur => (
+              <Button
+                key={fournisseur}
+                variant={selectedFournisseur === fournisseur ? "default" : "outline"}
+                onClick={() => setSelectedFournisseur(fournisseur)}
+                className="justify-start"
+              >
+                {fournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {CONVENTIONS_DISPONIBLES.filter(conv => conv.actif).map((convention) => (
-          <Card 
-            key={convention.id}
-            className={`cursor-pointer transition-all hover:shadow-lg ${
-              selectedConvention?.id === convention.id ? "ring-2 ring-primary" : ""
-            }`}
-            onClick={() => onConventionSelect(convention)}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <Building2 className="h-5 w-5 text-green-600 mt-1" />
-                <Badge variant="secondary" className="text-xs">
-                  {convention.fournisseurs.length} fournisseur{convention.fournisseurs.length > 1 ? 's' : ''}
-                </Badge>
-              </div>
-              <CardTitle className="text-base">{convention.nom}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {convention.description}
-              </p>
-              
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Percent className="h-4 w-4 text-blue-500" />
-                  <span>Taux : {convention.bareme.taux}%</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-orange-500" />
-                  <span>
-                    Jusqu'au {convention.dateFin ? 
-                      convention.dateFin.toLocaleDateString('fr-FR') : 
-                      'indéterminée'
-                    }
-                  </span>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <div className="text-xs text-muted-foreground mb-1">Fournisseurs :</div>
-                <div className="flex flex-wrap gap-1">
-                  {convention.fournisseurs.slice(0, 2).map((fournisseur) => (
-                    <Badge key={fournisseur} variant="outline" className="text-xs">
-                      {fournisseur}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Conventions Disponibles
+            {selectedFournisseur && (
+              <Badge variant="secondary">
+                {selectedFournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {filteredConventions.map(convention => (
+              <div
+                key={convention.id}
+                className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                  selectedConvention?.id === convention.id
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+                onClick={() => onConventionSelect(convention)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{convention.nom}</h3>
+                      {selectedConvention?.id === convention.id && (
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {convention.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs">
+                        Taux: {convention.bareme.taux}%
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Marge: {convention.bareme.marge}%
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        VR: {convention.bareme.valeurResiduelle}%
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant={convention.statut === "active" ? "default" : "secondary"}>
+                      {convention.statut}
                     </Badge>
-                  ))}
-                  {convention.fournisseurs.length > 2 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{convention.fournisseurs.length - 2}
-                    </Badge>
-                  )}
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {convention.dateFin 
+                        ? `Jusqu'au ${convention.dateFin.toLocaleDateString()}`
+                        : "Durée indéterminée"
+                      }
+                    </div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
