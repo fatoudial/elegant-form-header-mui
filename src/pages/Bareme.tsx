@@ -77,10 +77,10 @@ const FOURNISSEURS_OPTIONS = ["Sonacos", "Babacar & Fils", "Sénégal Auto", "Af
 const MATERIELS_OPTIONS = ["Tracteurs", "Véhicules Utilitaires", "Machines Industrielles", "Équipements Agricoles"];
 
 const CRITERES_PAR_TYPE = {
-  segment: ["PME", "Grand Compte", "Corporate", "Particulier"],
-  secteur: ["Agriculture", "Transport", "Industrie", "Commerce", "Services"],
-  profession: ["Médecin", "Avocat", "Architecte", "Comptable", "Ingénieur"],
-  groupe_client: ["Groupe A", "Groupe Premium", "Partenaires", "VIP"]
+  segment: ["PME", "Grand Compte", "Corporate", "Particulier", "Micro-entreprise"],
+  secteur: ["Agriculture et agroalimentaire", "Transport et logistique", "Industrie manufacturière", "Commerce et distribution", "Services aux entreprises", "BTP et construction", "Santé et services sociaux", "Education et formation", "Technologies et télécommunications", "Tourisme et hôtellerie"],
+  profession: ["Médecin", "Avocat", "Architecte", "Comptable", "Ingénieur", "Pharmacien", "Vétérinaire", "Dentiste", "Notaire", "Expert-comptable"],
+  groupe_client: ["Groupe A", "Groupe Premium", "Partenaires", "VIP", "Institutionnels"]
 };
 
 const Bareme = () => {
@@ -537,10 +537,10 @@ const Bareme = () => {
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="segment">Segment (LVA)</SelectItem>
-                                      <SelectItem value="secteur">Secteur d'activité (LVA)</SelectItem>
-                                      <SelectItem value="profession">Profession (LVA)</SelectItem>
-                                      <SelectItem value="groupe_client">Groupe de clients (LVB)</SelectItem>
+                                      <SelectItem value="segment">Segment</SelectItem>
+                                      <SelectItem value="secteur">Secteur d'activité</SelectItem>
+                                      <SelectItem value="profession">Profession</SelectItem>
+                                      <SelectItem value="groupe_client">Groupe de clients</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
