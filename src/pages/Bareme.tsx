@@ -381,16 +381,16 @@ const Bareme = () => {
                           </div>
                           <div>
                             <Label htmlFor="valeurResiduelle">
-                              {baremeForm.typologie === "LOA" ? "Valeur de reprise (%)" : "Valeur résiduelle (%)"}
+                              {baremeForm.typologie === "LLD" ? "Valeur de reprise (%)" : "Valeur résiduelle (%)"}
                             </Label>
                             <Input
                               id="valeurResiduelle"
                               type="number"
                               step="0.1"
-                              value={baremeForm.typologie === "LOA" ? baremeForm.valeurReprise : baremeForm.valeurResiduelle}
+                              value={baremeForm.typologie === "LLD" ? baremeForm.valeurReprise : baremeForm.valeurResiduelle}
                               onChange={(e) => setBaremeForm(prev => ({ 
                                 ...prev, 
-                                [baremeForm.typologie === "LOA" ? "valeurReprise" : "valeurResiduelle"]: e.target.value 
+                                [baremeForm.typologie === "LLD" ? "valeurReprise" : "valeurResiduelle"]: e.target.value 
                               }))}
                             />
                           </div>
