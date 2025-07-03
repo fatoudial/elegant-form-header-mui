@@ -231,12 +231,12 @@ const Bareme = () => {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold">Liste des Barèmes</h2>
               <Dialog open={isBaremeDialogOpen} onOpenChange={setIsBaremeDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={resetBaremeForm}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nouveau Barème
-                  </Button>
-                </DialogTrigger>
+                  <DialogTrigger asChild>
+                    <Button onClick={resetBaremeForm}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nouveau Barème
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>
