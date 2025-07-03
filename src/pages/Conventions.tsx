@@ -153,13 +153,21 @@ const Conventions = () => {
   const [formData, setFormData] = useState({
     nom: "",
     description: "",
-    fournisseurs: [] as string[],
+    fournisseur: "", // Single fournisseur instead of array
     prestatairesMaintenace: [] as string[],
     categoriesMateriels: [] as string[],
-    baremeId: "",
+    typologie: "",
+    type: "",
     taux: "",
+    duree: "",
+    periodicite: "",
+    typeEcheancier: "",
     marge: "",
     valeurResiduelle: "",
+    valeurReprise: "",
+    premierLoyerMajore: "",
+    premierLoyerType: "sup",
+    conditions: [] as any[],
     dateDebut: "",
     dateFin: "",
     reconductionTacite: false,
@@ -170,13 +178,21 @@ const Conventions = () => {
     setFormData({
       nom: "",
       description: "",
-      fournisseurs: [],
+      fournisseur: "",
       prestatairesMaintenace: [],
       categoriesMateriels: [],
-      baremeId: "",
+      typologie: "",
+      type: "",
       taux: "",
+      duree: "",
+      periodicite: "",
+      typeEcheancier: "",
       marge: "",
       valeurResiduelle: "",
+      valeurReprise: "",
+      premierLoyerMajore: "",
+      premierLoyerType: "sup",
+      conditions: [],
       dateDebut: "",
       dateFin: "",
       reconductionTacite: false,
@@ -190,13 +206,21 @@ const Conventions = () => {
     setFormData({
       nom: convention.nom,
       description: convention.description,
-      fournisseurs: convention.fournisseurs,
+      fournisseur: convention.fournisseurs[0] || "",
       prestatairesMaintenace: convention.prestatairesMaintenace,
       categoriesMateriels: convention.categoriesMateriels,
-      baremeId: "",
+      typologie: "",
+      type: "",
       taux: convention.bareme.taux.toString(),
+      duree: "",
+      periodicite: "",
+      typeEcheancier: "",
       marge: convention.bareme.marge.toString(),
       valeurResiduelle: convention.bareme.valeurResiduelle.toString(),
+      valeurReprise: "",
+      premierLoyerMajore: "",
+      premierLoyerType: "sup",
+      conditions: [],
       dateDebut: convention.dateDebut.toISOString().split('T')[0],
       dateFin: convention.dateFin ? convention.dateFin.toISOString().split('T')[0] : "",
       reconductionTacite: convention.reconductionTacite,
@@ -210,7 +234,7 @@ const Conventions = () => {
       id: editingConvention?.id || `conv-${Date.now()}`,
       nom: formData.nom,
       description: formData.description,
-      fournisseurs: formData.fournisseurs,
+      fournisseurs: [formData.fournisseur],
       prestatairesMaintenace: formData.prestatairesMaintenace,
       categoriesMateriels: formData.categoriesMateriels,
       bareme: {
@@ -291,8 +315,7 @@ const Conventions = () => {
   const toggleArrayValue = (array: string[], value: string, setter: (prev: any) => void) => {
     setter((prev: any) => ({
       ...prev,
-      [array === formData.fournisseurs ? 'fournisseurs' : 
-       array === formData.prestatairesMaintenace ? 'prestatairesMaintenace' : 'categoriesMateriels']: 
+      [array === formData.prestatairesMaintenace ? 'prestatairesMaintenace' : 'categoriesMateriels']: 
        array.includes(value) ? array.filter(item => item !== value) : [...array, value]
     }));
   };
@@ -397,94 +420,124 @@ const Conventions = () => {
 
                     <TabsContent value="partenaires" className="space-y-4">
                       <div>
-                        <Label>Fournisseurs agréés *</Label>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                          {FOURNISSEURS_DISPONIBLES.map(fournisseur => (
-                            <div
-                              key={fournisseur}
-                              className={`p-2 border rounded cursor-pointer transition-colors ${
-                                formData.fournisseurs.includes(fournisseur)
-                                  ? "bg-primary/10 border-primary"
-                                  : "hover:bg-accent"
-                              }`}
-                              onClick={() => toggleArrayValue(formData.fournisseurs, fournisseur, setFormData)}
-                            >
-                              <div className="text-sm font-medium">
+                        <Label>Fournisseur agréé *</Label>
+                        <Select value={formData.fournisseur} onValueChange={(value) => setFormData(prev => ({ ...prev, fournisseur: value }))}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un fournisseur" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FOURNISSEURS_DISPONIBLES.map(fournisseur => (
+                              <SelectItem key={fournisseur} value={fournisseur}>
                                 {fournisseur.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div>
                         <Label>Prestataires de maintenance</Label>
-                        <div className="grid grid-cols-3 gap-2 mt-2">
-                          {PRESTATAIRES_MAINTENANCE.map(prestataire => (
-                            <div
-                              key={prestataire}
-                              className={`p-2 border rounded cursor-pointer transition-colors ${
-                                formData.prestatairesMaintenace.includes(prestataire)
-                                  ? "bg-primary/10 border-primary"
-                                  : "hover:bg-accent"
-                              }`}
-                              onClick={() => toggleArrayValue(formData.prestatairesMaintenace, prestataire, setFormData)}
-                            >
-                              <div className="text-sm font-medium">
+                        <Select onValueChange={(value) => {
+                          if (!formData.prestatairesMaintenace.includes(value)) {
+                            setFormData(prev => ({ ...prev, prestatairesMaintenace: [...prev.prestatairesMaintenace, value] }));
+                          }
+                        }}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Ajouter un prestataire" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PRESTATAIRES_MAINTENANCE.filter(p => !formData.prestatairesMaintenace.includes(p)).map(prestataire => (
+                              <SelectItem key={prestataire} value={prestataire}>
                                 {prestataire.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              </div>
-                            </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {formData.prestatairesMaintenace.map(prestataire => (
+                            <Badge key={prestataire} variant="secondary" className="gap-1">
+                              {prestataire.replace('-', ' ')}
+                              <button
+                                onClick={() => setFormData(prev => ({ 
+                                  ...prev, 
+                                  prestatairesMaintenace: prev.prestatairesMaintenace.filter(p => p !== prestataire) 
+                                }))}
+                                className="text-xs"
+                              >
+                                ×
+                              </button>
+                            </Badge>
                           ))}
                         </div>
                       </div>
 
                       <div>
                         <Label>Catégories de matériel *</Label>
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                          {CATEGORIES_MATERIELS.map(categorie => (
-                            <div
-                              key={categorie.id}
-                              className={`p-3 border rounded cursor-pointer transition-colors ${
-                                formData.categoriesMateriels.includes(categorie.id)
-                                  ? "bg-primary/10 border-primary"
-                                  : "hover:bg-accent"
-                              }`}
-                              onClick={() => toggleArrayValue(formData.categoriesMateriels, categorie.id, setFormData)}
-                            >
-                              <div className="text-sm font-medium">{categorie.nom}</div>
-                              <div className="text-xs text-muted-foreground">{categorie.description}</div>
-                            </div>
-                          ))}
+                        <Select onValueChange={(value) => {
+                          if (!formData.categoriesMateriels.includes(value)) {
+                            setFormData(prev => ({ ...prev, categoriesMateriels: [...prev.categoriesMateriels, value] }));
+                          }
+                        }}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Ajouter une catégorie" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CATEGORIES_MATERIELS.filter(c => !formData.categoriesMateriels.includes(c.id)).map(categorie => (
+                              <SelectItem key={categorie.id} value={categorie.id}>
+                                {categorie.nom}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {formData.categoriesMateriels.map(categorieId => {
+                            const categorie = CATEGORIES_MATERIELS.find(c => c.id === categorieId);
+                            return (
+                              <Badge key={categorieId} variant="secondary" className="gap-1">
+                                {categorie?.nom}
+                                <button
+                                  onClick={() => setFormData(prev => ({ 
+                                    ...prev, 
+                                    categoriesMateriels: prev.categoriesMateriels.filter(c => c !== categorieId) 
+                                  }))}
+                                  className="text-xs"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            );
+                          })}
                         </div>
                       </div>
                     </TabsContent>
 
                     <TabsContent value="baremes" className="space-y-4">
-                      <div>
-                        <Label>Sélectionner un barème existant</Label>
-                        <Select value={formData.baremeId} onValueChange={(value) => {
-                          const bareme = BAREMES_DISPONIBLES.find(b => b.id === value);
-                          if (bareme) {
-                            setFormData(prev => ({
-                              ...prev,
-                              baremeId: value,
-                              taux: bareme.taux.toString(),
-                              marge: bareme.marge.toString(),
-                              valeurResiduelle: bareme.valeurResiduelle.toString()
-                            }));
-                          }
-                        }}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choisir un barème" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BAREMES_DISPONIBLES.map(bareme => (
-                              <SelectItem key={bareme.id} value={bareme.id}>
-                                {bareme.nom} ({bareme.taux}%)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="typologie">Typologie *</Label>
+                          <Select value={formData.typologie} onValueChange={(value) => setFormData(prev => ({ ...prev, typologie: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner une typologie" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Crédit-Bail">Crédit-Bail</SelectItem>
+                              <SelectItem value="LOA">LOA</SelectItem>
+                              <SelectItem value="LLD">LLD</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="type">Type *</Label>
+                          <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner un type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="standard">Standard</SelectItem>
+                              <SelectItem value="derogatoire">Dérogatoire</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-4">
@@ -500,6 +553,62 @@ const Conventions = () => {
                           />
                         </div>
                         <div>
+                          <Label htmlFor="duree">Durée (mois)</Label>
+                          <Input
+                            id="duree"
+                            type="number"
+                            value={formData.duree}
+                            onChange={(e) => setFormData(prev => ({ ...prev, duree: e.target.value }))}
+                            placeholder="36"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="periodicite">Périodicité</Label>
+                          <Select value={formData.periodicite} onValueChange={(value) => setFormData(prev => ({ ...prev, periodicite: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="mensuelle">Mensuelle</SelectItem>
+                              <SelectItem value="trimestrielle">Trimestrielle</SelectItem>
+                              <SelectItem value="semestrielle">Semestrielle</SelectItem>
+                              <SelectItem value="annuelle">Annuelle</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="typeEcheancier">Type échéancier</Label>
+                          <Select value={formData.typeEcheancier} onValueChange={(value) => setFormData(prev => ({ ...prev, typeEcheancier: value }))}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="constant">Constant</SelectItem>
+                              <SelectItem value="progressif">Progressif</SelectItem>
+                              <SelectItem value="degressif">Dégressif</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="valeurResiduelle">
+                            {formData.typologie === "LLD" ? "Valeur de reprise (%)" : "Valeur résiduelle (%)"}
+                          </Label>
+                          <Input
+                            id="valeurResiduelle"
+                            type="number"
+                            step="0.1"
+                            value={formData.typologie === "LLD" ? formData.valeurReprise : formData.valeurResiduelle}
+                            onChange={(e) => setFormData(prev => ({ 
+                              ...prev, 
+                              [formData.typologie === "LLD" ? "valeurReprise" : "valeurResiduelle"]: e.target.value 
+                            }))}
+                            placeholder="1.8"
+                          />
+                        </div>
+                        <div>
                           <Label htmlFor="marge">Marge (%)</Label>
                           <Input
                             id="marge"
@@ -510,18 +619,31 @@ const Conventions = () => {
                             placeholder="2.8"
                           />
                         </div>
-                        <div>
-                          <Label htmlFor="valeurResiduelle">Valeur Résiduelle (%)</Label>
-                          <Input
-                            id="valeurResiduelle"
-                            type="number"
-                            step="0.1"
-                            value={formData.valeurResiduelle}
-                            onChange={(e) => setFormData(prev => ({ ...prev, valeurResiduelle: e.target.value }))}
-                            placeholder="1.8"
-                          />
-                        </div>
                       </div>
+
+                      {formData.type === "derogatoire" && (
+                        <div>
+                          <Label>1er loyer majoré</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select value={formData.premierLoyerType} onValueChange={(value) => setFormData(prev => ({ ...prev, premierLoyerType: value }))}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="sup">Supérieur à</SelectItem>
+                                <SelectItem value="inf">Inférieur à</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={formData.premierLoyerMajore}
+                              onChange={(e) => setFormData(prev => ({ ...prev, premierLoyerMajore: e.target.value }))}
+                              placeholder="Valeur"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="apercu" className="space-y-4">
@@ -545,31 +667,94 @@ const Conventions = () => {
                           </div>
                           
                           <div>
-                            <Label className="text-sm font-medium text-muted-foreground">Fournisseurs</Label>
+                            <Label className="text-sm font-medium text-muted-foreground">Fournisseur</Label>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {formData.fournisseurs.length > 0 ? formData.fournisseurs.map(f => (
-                                <Badge key={f} variant="outline">{f}</Badge>
+                              {formData.fournisseur ? (
+                                <Badge variant="outline">{formData.fournisseur.replace('-', ' ')}</Badge>
+                              ) : <span className="text-muted-foreground text-sm">Aucun sélectionné</span>}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm font-medium text-muted-foreground">Prestataires de maintenance</Label>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {formData.prestatairesMaintenace.length > 0 ? formData.prestatairesMaintenace.map(p => (
+                                <Badge key={p} variant="outline">{p.replace('-', ' ')}</Badge>
                               )) : <span className="text-muted-foreground text-sm">Aucun sélectionné</span>}
                             </div>
                           </div>
 
                           <div>
-                            <Label className="text-sm font-medium text-muted-foreground">Barème</Label>
-                            <div className="grid grid-cols-3 gap-4 mt-2">
+                            <Label className="text-sm font-medium text-muted-foreground">Catégories de matériel</Label>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {formData.categoriesMateriels.length > 0 ? formData.categoriesMateriels.map(catId => {
+                                const cat = CATEGORIES_MATERIELS.find(c => c.id === catId);
+                                return <Badge key={catId} variant="outline">{cat?.nom}</Badge>;
+                              }) : <span className="text-muted-foreground text-sm">Aucune sélectionnée</span>}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm font-medium text-muted-foreground">Configuration Barème</Label>
+                            <div className="grid grid-cols-2 gap-4 mt-2">
+                              <div className="p-3 bg-gray-50 rounded">
+                                <div className="text-sm font-medium">Typologie</div>
+                                <div className="text-lg font-bold">{formData.typologie || "Non définie"}</div>
+                              </div>
+                              <div className="p-3 bg-gray-50 rounded">
+                                <div className="text-sm font-medium">Type</div>
+                                <div className="text-lg font-bold">{formData.type || "Non défini"}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label className="text-sm font-medium text-muted-foreground">Conditions Financières</Label>
+                            <div className="grid grid-cols-4 gap-4 mt-2">
                               <div className="text-center p-3 bg-blue-50 rounded">
                                 <div className="text-lg font-bold text-blue-600">{formData.taux || "0"}%</div>
                                 <div className="text-xs text-muted-foreground">Taux</div>
                               </div>
                               <div className="text-center p-3 bg-green-50 rounded">
-                                <div className="text-lg font-bold text-green-600">{formData.marge || "0"}%</div>
-                                <div className="text-xs text-muted-foreground">Marge</div>
+                                <div className="text-lg font-bold text-green-600">{formData.duree || "0"}</div>
+                                <div className="text-xs text-muted-foreground">Durée (mois)</div>
+                              </div>
+                              <div className="text-center p-3 bg-purple-50 rounded">
+                                <div className="text-lg font-bold text-purple-600">{formData.periodicite || "Non définie"}</div>
+                                <div className="text-xs text-muted-foreground">Périodicité</div>
                               </div>
                               <div className="text-center p-3 bg-orange-50 rounded">
-                                <div className="text-lg font-bold text-orange-600">{formData.valeurResiduelle || "0"}%</div>
-                                <div className="text-xs text-muted-foreground">VR</div>
+                                <div className="text-lg font-bold text-orange-600">
+                                  {formData.typologie === "LLD" ? (formData.valeurReprise || "0") : (formData.valeurResiduelle || "0")}%
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formData.typologie === "LLD" ? "Valeur reprise" : "VR"}
+                                </div>
                               </div>
                             </div>
                           </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="text-center p-3 bg-gray-50 rounded">
+                              <div className="text-lg font-bold text-gray-600">{formData.typeEcheancier || "Non défini"}</div>
+                              <div className="text-xs text-muted-foreground">Type échéancier</div>
+                            </div>
+                            <div className="text-center p-3 bg-red-50 rounded">
+                              <div className="text-lg font-bold text-red-600">{formData.marge || "0"}%</div>
+                              <div className="text-xs text-muted-foreground">Marge</div>
+                            </div>
+                          </div>
+
+                          {formData.type === "derogatoire" && formData.premierLoyerMajore && (
+                            <div>
+                              <Label className="text-sm font-medium text-muted-foreground">1er Loyer Majoré</Label>
+                              <div className="p-3 bg-yellow-50 rounded mt-1">
+                                <div className="text-lg font-bold text-yellow-600">
+                                  {formData.premierLoyerType === "sup" ? "≥ " : "≤ "}{formData.premierLoyerMajore}%
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     </TabsContent>
